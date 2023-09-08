@@ -7,19 +7,32 @@ import pytest
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    'name, kwargs',
+    'name, kwargs, status, parametrized_client',
     (
-        ('news:home', None),
-        ('news:detail', pytest.lazy_fixture('news_kwargs_pk')),
-        ('users:login', None),
-        ('users:logout', None),
-        ('users:signup', None),
+        ('news:home', None, HTTPStatus.OK, pytest.lazy_fixture('client')),
+        ('users:login', None, HTTPStatus.OK, pytest.lazy_fixture('client')),
+        ('users:logout', None, HTTPStatus.OK, pytest.lazy_fixture('client')),
+        ('users:signup', None, HTTPStatus.OK, pytest.lazy_fixture('client')),
+        (
+            'news:detail', pytest.lazy_fixture('news_kwargs_pk'),
+            HTTPStatus.OK, pytest.lazy_fixture('client')
+        ),
+        (
+            'news:edit', pytest.lazy_fixture('comment_kwargs_pk'),
+            HTTPStatus.NOT_FOUND, pytest.lazy_fixture('admin_client')
+        ),
+        (
+            'news:delete', pytest.lazy_fixture('comment_kwargs_pk'),
+            HTTPStatus.NOT_FOUND, pytest.lazy_fixture('admin_client')
+        ),
     ),
 )
-def test_pages_available_for_anonymous_user(client, name, kwargs):
+def test_pages_available_for_anonymous_user(
+    parametrized_client, name, kwargs, status
+):
     url = reverse(name, kwargs=kwargs)
-    response = client.get(url)
-    assert response.status_code == HTTPStatus.OK
+    response = parametrized_client.get(url)
+    assert response.status_code == status
 
 
 @pytest.mark.parametrize(
@@ -51,13 +64,3 @@ def test_redirect_for_anonymous_client(client, name, comment):
     login_url = reverse('users:login')
     expected_url = f'{login_url}?next={url}'
     assertRedirects(response, expected_url)
-
-
-@pytest.mark.parametrize(
-    'name',
-    ('news:edit', 'news:delete')
-)
-def test_pages_not_available_for_other_user(admin_client, name, comment):
-    url = reverse(name, args=(comment.id,))
-    response = admin_client.get(url)
-    assert response.status_code == HTTPStatus.NOT_FOUND

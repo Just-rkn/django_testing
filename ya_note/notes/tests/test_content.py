@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
@@ -14,27 +14,32 @@ class TestContent(TestCase):
     def setUpTestData(cls):
         cls.reader = User.objects.create(username='тестовый читатель')
         cls.author = User.objects.create(username='Тестовый автор')
+        cls.reader_client = Client()
+        cls.reader_client.force_login(cls.reader)
+        cls.author_client = Client()
+        cls.author_client.force_login(cls.author)
+        cls.notes_list_url = reverse('notes:list')
+        cls.note_add_route = 'notes:add'
+        cls.note_edit_route = 'notes:edit'
         cls.note = Note.objects.create(
             title='Текст заголовка', text='Текст заметки', author=cls.author
         )
 
     def test_notes_list_for_different_users(self):
         users = (
-            (self.author, True),
-            (self.reader, False),
+            (self.author_client, True),
+            (self.reader_client, False),
         )
-        for user, note_in_list in users:
+        for user_client, note_in_list in users:
             with self.subTest(name='note_in_list'):
-                url = reverse('notes:list')
-                self.client.force_login(user)
-                response = self.client.get(url)
+                response = user_client.get(self.notes_list_url)
                 object_list = response.context['object_list']
                 self.assertIs(self.note in object_list, note_in_list)
 
     def test_user_has_form(self):
         users_url = (
-            (self.reader, 'notes:add', None),
-            (self.author, 'notes:edit', (self.note.slug,)),
+            (self.reader, self.note_add_route, None),
+            (self.author, self.note_edit_route, (self.note.slug,)),
         )
         for user, name, args in users_url:
             with self.subTest(name=name):
