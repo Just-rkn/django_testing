@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import pytest
 from django.utils import timezone
 from django.urls import reverse
+from django.db import transaction
 
 from news.models import Comment, News
 from news.forms import BAD_WORDS
@@ -65,12 +66,13 @@ def news_list_with_different_date():
 @pytest.fixture
 def comments_list_with_different_date(author, news):
     today = timezone.now()
-    for index in range(5):
-        comment = Comment.objects.create(
-            news=news, author=author, text=f'Текст {index}'
-        )
-        comment.created = today - timedelta(days=index)
-        comment.save()
+    with transaction.atomic():
+        for index in range(5):
+            comment = Comment.objects.create(
+                news=news, author=author, text=f'Текст {index}'
+            )
+            comment.created = today - timedelta(days=index)
+            comment.save()
 
 
 @pytest.fixture
